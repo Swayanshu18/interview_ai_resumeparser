@@ -1,0 +1,171 @@
+# ===========================
+# Dependencies
+# ===========================
+node_modules/
+*/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ===========================
+# Environment Variables
+# ===========================
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+backend/.env
+frontend/.env
+.env.*.local
+
+# ===========================
+# Production Builds
+# ===========================
+dist/
+build/
+*/dist/
+*/build/
+frontend/dist/
+backend/build/
+out/
+
+# ===========================
+# Logs
+# ===========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# ===========================
+# OS Files
+# ===========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ===========================
+# IDEs and Editors
+# ===========================
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.iml
+*.swp
+*.swo
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.code-workspace
+
+# ===========================
+# Testing
+# ===========================
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# ===========================
+# Temporary Files
+# ===========================
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ===========================
+# Uploads & User Data
+# ===========================
+uploads/
+backend/uploads/
+*.pdf
+!docs/*.pdf
+
+# ===========================
+# MongoDB Data
+# ===========================
+data/
+mongodb/
+
+# ===========================
+# Docker
+# ===========================
+.dockerignore
+docker-compose.override.yml
+
+# ===========================
+# CI/CD
+# ===========================
+.github/workflows/*.yml
+!.github/workflows/deploy.yml
+
+# ===========================
+# Process Managers
+# ===========================
+.pm2/
+ecosystem.config.js
+
+# ===========================
+# Deployment
+# ===========================
+.vercel
+.netlify
+.firebase/
+
+# ===========================
+# Misc
+# ===========================
+.cache
+.parcel-cache
+.next/
+.nuxt/
+.vuepress/dist
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+.vscode-test
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ===========================
+# Security
+# ===========================
+*.key
+*.pem
+*.cert
+*.crt
+credentials.json
+serviceAccountKey.json
+
+# ===========================
+# Backup Files
+# ===========================
+*.bak
+*.backup
+*.old
+*~
