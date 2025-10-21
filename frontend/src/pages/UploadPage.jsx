@@ -19,7 +19,7 @@ function UploadPage() {
   const fetchDocuments = async () => {
     try {
       const response = await documentService.list();
-      setDocuments(response.data || []);
+      setDocuments(response.documents || []);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
       setDocuments([]);
@@ -56,9 +56,23 @@ function UploadPage() {
     }, 200);
 
     try {
+      const toastId = toast.loading(
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 animate-pulse text-blue-600" />
+          <span>Processing PDF and generating embeddings...</span>
+        </div>
+      );
+
       await documentService.upload(file, type);
       setUploadProgress(prev => ({ ...prev, [type]: 100 }));
-      toast.success(`${type === 'resume' ? 'Resume' : 'Job Description'} uploaded successfully!`);
+
+      toast.dismiss(toastId);
+      toast.success(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-600" />
+          <span>{type === 'resume' ? 'Resume' : 'Job Description'} uploaded and processed!</span>
+        </div>
+      );
       await fetchDocuments();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Upload failed');
@@ -75,7 +89,7 @@ function UploadPage() {
     try {
       await documentService.delete(id);
       toast.success('Document deleted successfully');
-      setDocuments(documents.filter(doc => doc._id !== id));
+      setDocuments(documents.filter(doc => doc.id !== id));
     } catch (error) {
       toast.error('Failed to delete document');
     }
@@ -110,10 +124,13 @@ function UploadPage() {
         {hasDocument('resume') ? (
           <>
             <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-            <p className="text-lg font-medium text-gray-900">Resume Uploaded</p>
-            <p className="text-sm text-gray-500 mt-2">
-              {documents.find(d => d.type === 'resume')?.filename}
-            </p>
+            <p className="text-lg font-medium text-gray-900">Resume Uploaded ✓</p>
+            <div className="mt-3 px-4 py-2 bg-white border border-green-200 rounded-lg inline-block">
+              <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-green-600" />
+                {documents.find(d => d.type === 'resume')?.filename}
+              </p>
+            </div>
           </>
         ) : uploading.resume ? (
           <>
@@ -169,10 +186,13 @@ function UploadPage() {
         {hasDocument('job_description') ? (
           <>
             <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-            <p className="text-lg font-medium text-gray-900">Job Description Uploaded</p>
-            <p className="text-sm text-gray-500 mt-2">
-              {documents.find(d => d.type === 'job_description')?.filename}
-            </p>
+            <p className="text-lg font-medium text-gray-900">Job Description Uploaded ✓</p>
+            <div className="mt-3 px-4 py-2 bg-white border border-green-200 rounded-lg inline-block">
+              <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-green-600" />
+                {documents.find(d => d.type === 'job_description')?.filename}
+              </p>
+            </div>
           </>
         ) : uploading.job_description ? (
           <>
@@ -236,7 +256,7 @@ function UploadPage() {
           <div className="space-y-3">
             {documents.map((doc) => (
               <div
-                key={doc._id}
+                key={doc.id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
               >
                 <div className="flex items-center space-x-3">
@@ -250,7 +270,7 @@ function UploadPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleDelete(doc._id, doc.type)}
+                  onClick={() => handleDelete(doc.id, doc.type)}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                 >
                   <Trash2 className="h-5 w-5" />
@@ -262,18 +282,35 @@ function UploadPage() {
       )}
 
       {canStartInterview ? (
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-8 text-center text-white">
-          <CheckCircle className="mx-auto h-16 w-16 mb-4" />
-          <h3 className="text-2xl font-bold mb-2">Ready to Start!</h3>
-          <p className="mb-6">
-            Both documents uploaded successfully. You can now begin your interview preparation.
-          </p>
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-xl p-10 text-center text-white animate-fadeIn">
+          <div className="flex justify-center mb-4">
+            <div className="bg-white/20 p-4 rounded-full">
+              <CheckCircle className="h-16 w-16" />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold mb-3">All Set! Ready to Begin?</h3>
+          <div className="mb-6 space-y-2">
+            <p className="text-lg text-blue-50">
+              Both documents have been uploaded and processed successfully.
+            </p>
+            <div className="flex items-center justify-center gap-4 text-sm text-blue-100">
+              <span className="flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" /> Resume Ready
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" /> Job Description Ready
+              </span>
+            </div>
+          </div>
           <button
             onClick={() => navigate('/chat')}
-            className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-md"
+            className="bg-white text-blue-600 px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 hover:scale-105 transition-all shadow-lg hover:shadow-xl"
           >
-            Start Interview
+            Begin Interview Now →
           </button>
+          <p className="mt-4 text-sm text-blue-100">
+            Your AI interviewer is ready to assess your qualifications
+          </p>
         </div>
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 flex items-start space-x-3">

@@ -12,6 +12,8 @@ function ChatPage() {
   const [initializing, setInitializing] = useState(true);
   const [chatId, setChatId] = useState(null);
   const [showCitation, setShowCitation] = useState(null);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -62,7 +64,7 @@ function ChatPage() {
         if (assistantMessages.length > 0) {
           const initialMessage = {
             role: 'assistant',
-            content: `Welcome to your AI-powered interview! I've analyzed the job description and prepared some questions for you. Let's get started:\n\n${assistantMessages[0].content}\n\nPlease answer the first question to begin.`,
+            content: assistantMessages[0].content, // Just show the question directly, no extra text
             timestamp: new Date().toISOString()
           };
           setMessages([initialMessage]);
@@ -78,7 +80,7 @@ function ChatPage() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || loading || !chatId) return;
+    if (!input.trim() || loading || !chatId || isInterviewComplete) return;
 
     const userMessage = {
       role: 'user',
@@ -102,6 +104,20 @@ function ChatPage() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Check if interview is complete
+      if (response.isComplete) {
+        setIsInterviewComplete(true);
+        toast.success('Interview completed! Thank you for your responses.', {
+          duration: 5000,
+          icon: '🎉'
+        });
+      }
+
+      // Update question count
+      if (response.questionCount) {
+        setQuestionCount(response.questionCount);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send message');
 
@@ -131,7 +147,7 @@ function ChatPage() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div className="bg-white rounded-lg max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">Citation from Resume</h3>
+            <h3 className="text-xl font-bold text-gray-900">Citation from Document</h3>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -163,10 +179,23 @@ function ChatPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900">AI Interview Simulation</h1>
-          <p className="text-gray-600 text-sm mt-1">
-            Answer the questions thoughtfully. I'll provide feedback based on your resume and the job description.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">AI Interview Simulation</h1>
+              <p className="text-gray-600 text-sm mt-1">
+                {isInterviewComplete
+                  ? 'Interview complete! Review your responses above.'
+                  : 'Answer the questions thoughtfully. I\'ll provide feedback based on your resume and the job description.'}
+              </p>
+            </div>
+            {questionCount > 0 && (
+              <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+                <span className="text-sm font-medium text-blue-900">
+                  Question {Math.min(questionCount, 3)} of 3
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -227,11 +256,11 @@ function ChatPage() {
                           {message.citations.map((citation, idx) => (
                             <button
                               key={idx}
-                              onClick={() => setShowCitation(citation)}
+                              onClick={() => setShowCitation(citation.text || citation)}
                               className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
                             >
                               <FileText className="h-4 w-4" />
-                              <span>View citation {idx + 1}</span>
+                              <span>View citation {idx + 1} ({citation.type}) - {citation.relevance}% match</span>
                             </button>
                           ))}
                         </div>
@@ -273,29 +302,51 @@ function ChatPage() {
       {/* Input */}
       <div className="bg-white border-t border-gray-200 px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-end space-x-3">
-            <div className="flex-1">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your answer here... (Press Enter to send)"
-                rows="3"
-                disabled={loading}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+          {isInterviewComplete ? (
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 text-center border border-green-200">
+              <div className="flex justify-center mb-3">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <Award className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Interview Complete!</h3>
+              <p className="text-gray-600 mb-4">
+                You've answered all 3 questions. Review your responses and feedback above.
+              </p>
+              <button
+                onClick={() => navigate('/upload')}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+              >
+                Start New Interview
+              </button>
             </div>
-            <button
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              className="flex-shrink-0 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              <Send className="h-6 w-6" />
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Press Shift + Enter for a new line
-          </p>
+          ) : (
+            <>
+              <div className="flex items-end space-x-3">
+                <div className="flex-1">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your answer here... (Press Enter to send)"
+                    rows="3"
+                    disabled={loading || isInterviewComplete}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <button
+                  onClick={handleSend}
+                  disabled={loading || !input.trim() || isInterviewComplete}
+                  className="flex-shrink-0 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  <Send className="h-6 w-6" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Press Shift + Enter for a new line
+              </p>
+            </>
+          )}
         </div>
       </div>
 

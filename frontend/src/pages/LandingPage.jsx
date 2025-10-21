@@ -54,7 +54,37 @@ const LandingPage = () => {
           </div>
         </div>
         <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
-          <div className="h-56 w-full bg-gradient-to-br from-primary-400 to-primary-600 sm:h-72 md:h-96 lg:w-full lg:h-full"></div>
+          <div className="h-56 w-full bg-gradient-to-br from-blue-500 to-indigo-600 sm:h-72 md:h-96 lg:w-full lg:h-full flex items-center justify-center p-8">
+            <div className="text-center text-white space-y-6">
+              <div className="flex justify-center space-x-4">
+                <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
+                  <FileText className="h-12 w-12" />
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
+                  <MessageSquare className="h-12 w-12" />
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
+                  <Award className="h-12 w-12" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold">AI-Powered Interviews</h3>
+                <p className="text-blue-100 max-w-md mx-auto">
+                  Upload your documents, practice with AI, and get instant feedback on your performance
+                </p>
+              </div>
+              <div className="flex justify-center space-x-6 text-sm">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Real-time Feedback</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Personalized Questions</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

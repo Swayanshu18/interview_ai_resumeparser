@@ -26,39 +26,47 @@ router.post('/start', authMiddleware, async (req, res) => {
     });
 
     if (!chat) {
-      // Generate initial interview questions based on job description
-      const prompt = `Based on the following job description, generate 3 relevant interview questions that would help assess a candidate's qualifications. Format as a numbered list.
+      // Generate FIRST interview question based on job description
+      const prompt = `You are starting an interview. Based on the job description below, ask ONLY the first question.
 
 Job Description:
 ${jobDescription.fullText.substring(0, 2000)}
 
-Generate questions that are specific, relevant, and behavioral when appropriate.`;
+IMPORTANT RULES:
+- Ask ONLY ONE question (the first question)
+- DO NOT include numbers like "1.", "2.", "3."
+- DO NOT list multiple questions
+- DO NOT say "Let's begin with" or similar phrases
+- Just ask a single, direct question
+
+Your response should be ONLY the question itself, nothing else.`;
 
       const completion = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini-2024-07-18',
         messages: [
-          { role: 'system', content: 'You are an experienced technical interviewer.' },
+          { role: 'system', content: 'You are an interviewer. You MUST ask only ONE question at a time. Never list multiple questions.' },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 150
       });
 
-      const questions = completion.choices[0].message.content;
+      const firstQuestion = completion.choices[0].message.content.trim();
 
       // Create new chat session
       chat = new Chat({
         userId: req.userId,
         resumeId: resume._id,
         jobDescriptionId: jobDescription._id,
+        questionCount: 1, // Starting with first question
         messages: [
           {
             role: 'system',
-            content: 'You are conducting a job interview based on the provided job description.'
+            content: 'You are conducting a job interview based on the provided job description. Ask questions one at a time and provide feedback after each answer.'
           },
           {
             role: 'assistant',
-            content: questions
+            content: firstQuestion
           }
         ]
       });
@@ -126,75 +134,175 @@ router.post('/query', authMiddleware, async (req, res) => {
       `[${chunk.documentType}]: ${chunk.text}`
     ).join('\n\n');
 
-    // Generate evaluation using RAG
-    const evaluationPrompt = `You are evaluating an interview response.
-
-Question asked: ${lastQuestion}
-
-Candidate's response: ${message}
-
-Relevant context from resume and job description:
-${context}
-
-Please evaluate this response on a scale of 1-10 and provide specific feedback (100 words max). Consider:
-1. How well the answer addresses the question
-2. Relevance to the job requirements
-3. Use of specific examples or experiences
-4. Communication clarity
-
-Format your response as:
-Score: [1-10]
-Feedback: [Your detailed feedback]
-
-Then suggest a follow-up question based on the response.`;
-
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini-2024-07-18',
-      messages: [
-        { role: 'system', content: 'You are an experienced technical interviewer providing constructive feedback.' },
-        { role: 'user', content: evaluationPrompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 400
-    });
-
-    const aiResponse = completion.choices[0].message.content;
-
-    // Parse score from response
-    const scoreMatch = aiResponse.match(/Score:\s*(\d+)/i);
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
-
-    // Add messages to chat
+    // Add user message to chat
     chat.messages.push({
       role: 'user',
       content: message
     });
 
-    chat.messages.push({
-      role: 'assistant',
-      content: aiResponse,
-      score,
-      citations: similarChunks.map(chunk => ({
-        documentId: chunk.documentId,
-        chunkIndex: chunk.chunkIndex,
-        text: chunk.text.substring(0, 200) + '...'
-      }))
-    });
+    // Check if this is the last question (3rd question answered)
+    const isLastQuestion = chat.questionCount >= 3;
+
+    let aiResponse;
+    let score = null;
+
+    if (isLastQuestion) {
+      // Generate comprehensive evaluation for ALL 3 answers
+      const allQuestionsAndAnswers = [];
+      let currentQuestion = '';
+
+      // Extract all Q&A pairs
+      for (let i = 0; i < chat.messages.length; i++) {
+        const msg = chat.messages[i];
+        if (msg.role === 'assistant' && !msg.content.includes('Score:') && !msg.content.includes('Welcome')) {
+          currentQuestion = msg.content;
+        } else if (msg.role === 'user') {
+          if (currentQuestion) {
+            allQuestionsAndAnswers.push({
+              question: currentQuestion,
+              answer: msg.content
+            });
+            currentQuestion = '';
+          }
+        }
+      }
+
+      const evaluationPrompt = `You are evaluating a complete 3-question interview. Here are all the questions and answers:
+
+${allQuestionsAndAnswers.map((qa, idx) =>
+  `Question ${idx + 1}: ${qa.question}\n\nCandidate's Answer ${idx + 1}: ${qa.answer}`
+).join('\n\n---\n\n')}
+
+Relevant context from resume and job description:
+${context}
+
+Please provide a comprehensive evaluation:
+
+1. For each answer, provide:
+   - Score (1-10)
+   - Specific feedback (2-3 sentences)
+
+2. Overall interview summary with:
+   - Overall performance score (1-10)
+   - Key strengths
+   - Areas for improvement
+   - Final recommendation
+
+Format your response EXACTLY as:
+Answer 1 Score: [1-10]
+Answer 1 Feedback: [Your feedback]
+
+Answer 2 Score: [1-10]
+Answer 2 Feedback: [Your feedback]
+
+Answer 3 Score: [1-10]
+Answer 3 Feedback: [Your feedback]
+
+Overall Score: [1-10]
+Summary: [Your comprehensive summary with strengths, areas for improvement, and recommendation]`;
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini-2024-07-18',
+        messages: [
+          { role: 'system', content: 'You are an experienced technical interviewer providing comprehensive feedback on a complete interview.' },
+          { role: 'user', content: evaluationPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      });
+
+      aiResponse = completion.choices[0].message.content;
+
+      // Parse overall score
+      const overallScoreMatch = aiResponse.match(/Overall Score:\s*(\d+)/i);
+      score = overallScoreMatch ? parseInt(overallScoreMatch[1]) : null;
+
+      // Add comprehensive feedback with citations
+      chat.messages.push({
+        role: 'assistant',
+        content: aiResponse,
+        score,
+        citations: similarChunks.map(chunk => ({
+          documentId: chunk.documentId,
+          chunkIndex: chunk.chunkIndex,
+          text: chunk.text.substring(0, 200) + '...'
+        }))
+      });
+    } else {
+      // Just ask the next question, no feedback yet
+      const nextQuestionPrompt = `Based on the following job description and the candidate's previous responses, generate ONE new relevant interview question.
+
+Job Description:
+${jobDescription.fullText.substring(0, 2000)}
+
+Previous conversation:
+${chat.messages.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n')}
+
+Generate ONE specific, relevant interview question. DO NOT provide feedback or scores. Just ask the next question.`;
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini-2024-07-18',
+        messages: [
+          { role: 'system', content: 'You are an experienced technical interviewer. Ask questions one at a time without providing feedback yet.' },
+          { role: 'user', content: nextQuestionPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 200
+      });
+
+      aiResponse = completion.choices[0].message.content;
+
+      // Add next question without score or citations
+      chat.messages.push({
+        role: 'assistant',
+        content: aiResponse
+      });
+    }
+
+    // Increment question count if not the last question
+    // (questionCount tracks questions asked, not answered - so only increment when asking next question)
+    if (!isLastQuestion) {
+      chat.questionCount += 1;
+    } else {
+      // Mark interview as complete after 3rd question is answered
+      chat.isActive = false;
+    }
 
     await chat.save();
 
     res.json({
       response: aiResponse,
-      score,
-      citations: similarChunks.map(chunk => ({
+      score: isLastQuestion ? score : undefined, // Only send score at the end
+      isComplete: isLastQuestion, // Signal to frontend that interview is complete
+      questionCount: chat.questionCount,
+      citations: isLastQuestion ? similarChunks.map(chunk => ({
         type: chunk.documentType,
         text: chunk.text.substring(0, 200) + '...',
         relevance: Math.round(chunk.similarity * 100)
-      }))
+      })) : undefined // Only send citations at the end
     });
   } catch (error) {
     console.error('Query chat error:', error);
     res.status(500).json({ error: 'Failed to process response' });
+  }
+});
+
+// DELETE /api/chat/reset - Reset/delete active chat session
+router.delete('/reset', authMiddleware, async (req, res) => {
+  try {
+    // Find and delete active chat session
+    const result = await Chat.deleteMany({
+      userId: req.userId,
+      isActive: true
+    });
+
+    res.json({
+      message: 'Chat session reset successfully',
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Reset chat error:', error);
+    res.status(500).json({ error: 'Failed to reset chat session' });
   }
 });
 

@@ -126,6 +126,11 @@ export const chatService = {
     const response = await api.get(`/chat/history/${chatId}`);
     return response.data;
   },
+
+  reset: async () => {
+    const response = await api.delete('/chat/reset');
+    return response.data;
+  },
 };
 
 export default api;
